@@ -2,5 +2,7 @@
   "commandDescription": "print a greeting and your org IDs",
   "nameFlagDescription": "name to print",
   "forceFlagDescription": "example boolean flag",
-  "errorNoOrgResults": "No results found for the org '%s'."
+  "errorNoOrgResults": "No results found for the org '%s'.",
+  "macroDeveloperName": "(required) developer name of the macro to pull",
+  "retrievetargetdir": "(required) directory root for the retrieved files"
 }

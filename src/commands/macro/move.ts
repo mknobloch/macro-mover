@@ -27,34 +27,66 @@ export default class Org extends SfdxCommand {
 
   protected static flagsConfig = {
     // flag with a value (-n, --name=VALUE)
-    name: flags.string({char: 'n', description: messages.getMessage('nameFlagDescription')}),
-    force: flags.boolean({char: 'f', description: messages.getMessage('forceFlagDescription')})
+    macrodevelopername: flags.string({
+      char: 'n',
+      description: messages.getMessage('macroDeveloperName')}),
+
+    retrievetargetdir: flags.directory({
+      char: 'r',
+      description: messages.getMessage('retrievetargetdir')})
   };
 
-  // Comment this out if your command does not require an org username
-  protected static requiresUsername = true;
-
-  // Comment this out if your command does not support a hub org username
-  protected static supportsDevhubUsername = true;
-
-  // Set this to true if your command requires a project workspace; 'requiresProject' is false by default
+  protected static supportsUsername = true;
   protected static requiresProject = false;
 
   public async run(): Promise<AnyJson> {
+
+    //params
     const name = this.flags.name || 'world';
+
+    //config defaults:
+    this.ux.log(JSON.stringify(this.configAggregator.getPropertyValue('defaultusername')));
 
     // this.org is guaranteed because requiresUsername=true, as opposed to supportsUsername
     const conn = this.org.getConnection();
-    const query = 'Select Name, TrialExpirationDate from Organization';
+    const macroQuery = 'Select Description, FolderName, IsAlohaSupported, IsLightningSupported, ' +
+                              'Name, StartingContext from Macro';
 
     // The type we are querying for
-    interface Organization {
+    interface Macro {
+      Description: string;
+      FolderName: string;
+      IsAlohaSupported: boolean;
+      IsLightingSupported: boolean;
       Name: string;
-      TrialExpirationDate: string;
+      StartingContext: string;
     }
 
     // Query the org
-    const result = await conn.query<Organization>(query);
+    let result = await conn.query<Macro>(macroQuery);
+    const macroRecords = JSON.parse(JSON.stringify(result.records).replace(/null/g, '""'))
+    this.ux.logJson(macroRecords);
+
+    let folderNamesSet = new Set([]);
+    macroRecords.forEach(function(record){
+      if(record.FolderName !== ''){
+        folderNamesSet.add(record.FolderName);
+      }
+    });
+
+    // The type we are querying for
+    interface Folder {
+      Id: string;
+      FolderName: string;
+      DeveloperName: string;
+      AccessType: string;
+    }
+
+    result = await conn.query<Folder>(this.getTargetOrgFolderQueryString(folderNamesSet));
+    const folderRecords = result.records;
+    this.ux.logJson(folderRecords);
+
+    // ----------------------------------------
 
     // Organization will always return one result, but this is an example of throwing an error
     // The output and --json will automatically be handled for you.
@@ -63,14 +95,9 @@ export default class Org extends SfdxCommand {
     }
 
     // Organization always only returns one result
-    const orgName = result.records[0].Name;
-    const trialExpirationDate = result.records[0].TrialExpirationDate;
+    const macroDescription = result.records[0].Description;
 
-    let outputString = `Hello ${name}! This is org: ${orgName}`;
-    if (trialExpirationDate) {
-      const date = new Date(trialExpirationDate).toDateString();
-      outputString = `${outputString} and I will be around until ${date}!`;
-    }
+    let outputString = `Hello I pulled one macro with description: ${macroDescription}!`;
     this.ux.log(outputString);
 
     // this.hubOrg is NOT guaranteed because supportsHubOrgUsername=true, as opposed to requiresHubOrgUsername.
@@ -85,5 +112,15 @@ export default class Org extends SfdxCommand {
 
     // Return an object to be displayed with --json
     return { orgId: this.org.getOrgId(), outputString };
+  }
+
+  private getTargetOrgFolderQueryString(folderNamesSet) {
+    let folderQuery = 'Select Id, Name, DeveloperName, AccessType From Folder Where Name IN (';
+
+    folderNamesSet.forEach(function(folderName) {
+      folderQuery += '\'' + folderName + '\',';
+    })
+
+    return folderQuery.substring(0, folderQuery.length - 1) + ')';
   }
 }
