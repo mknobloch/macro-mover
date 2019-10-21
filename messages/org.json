@@ -1,10 +1,8 @@
 {
-  "commandDescription": "print a greeting and your org IDs",
-  "nameFlagDescription": "name to print",
-  "forceFlagDescription": "example boolean flag",
-  "errorNoOrgResults": "No results found for the org '%s'.",
+  "retrieveDescription": "retrieves macros and their related macroinstructions from an org and writes to a file",
   "macroDeveloperName": "(required) developer name of the macro to pull",
   "retrievetargetdir": "(required) directory root for the retrieved files",
   "retrieveType": "(required) type of macro retrieve. Either list or all.",
-  "targetMacros": "(optional) list of macros to be retrieved. Required if the retrieveType is \"list\""
+  "targetMacros": "(optional) list of macros to be retrieved. Required if the retrieveType is \"list\"",
+  "errorNoMacrosReturned": "No macros matching the given names were found in the target org."
 }

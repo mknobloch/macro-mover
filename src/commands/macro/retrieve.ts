@@ -11,7 +11,7 @@ const messages = Messages.loadMessages('macro-mover', 'org');
 
 export default class Org extends SfdxCommand {
 
-  public static description = messages.getMessage('commandDescription');
+  public static description = messages.getMessage('retrieveDescription');
 
   public static examples = [
   `$ sfdx hello:org --targetusername myOrg@example.com --targetdevhubusername devhub@org.com
@@ -68,6 +68,10 @@ export default class Org extends SfdxCommand {
     // Query the org
     let macroResult = await conn.query<Macro>(this.getMacroQuery(this.flags.targetmacros));
     const macroRecords = JSON.parse(JSON.stringify(macroResult.records).replace(/null/g, '""'));
+
+    if(macroRecords.length === 0) {
+      throw new SfdxError(messages.getMessage('errorNoMacrosReturned'));
+    }
     
     this.ux.stopSpinner;
     this.ux.log('\n' + macroRecords.length + ' Macros retrieved.')
@@ -106,16 +110,15 @@ export default class Org extends SfdxCommand {
       })
     });
 
+    let result = {
+      Macros: macroRecords
+    };
+
     if(this.flags.retrievetargetdir) {
-      await fs.writeJson(this.flags.retrievetargetdir, macroRecords);
+      await fs.writeJson(this.flags.retrievetargetdir, result);
     }
 
-    if (!macroResult.records || macroResult.records.length <= 0) {
-      throw new SfdxError(messages.getMessage('errorNoOrgResults', [this.org.getOrgId()]));
-    }
-
-    // Return an object to be displayed with --json
-    return { orgId: this.org.getOrgId() };
+    return { result };
   }
 
   private getMacroQuery(targetMacros) {

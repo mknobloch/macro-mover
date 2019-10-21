@@ -11,7 +11,7 @@ const messages = Messages.loadMessages('macro-mover', 'org');
 
 export default class Org extends SfdxCommand {
 
-  public static description = messages.getMessage('commandDescription');
+  public static description = messages.getMessage('retrieveDescription');
 
   public static examples = [
   `$ sfdx hello:org --targetusername myOrg@example.com --targetdevhubusername devhub@org.com
