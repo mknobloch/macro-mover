@@ -29,11 +29,24 @@ export default class Org extends SfdxCommand {
     // flag with a value (-n, --name=VALUE)
     macrodevelopername: flags.string({
       char: 'n',
-      description: messages.getMessage('macroDeveloperName')}),
+      description: messages.getMessage('macroDeveloperName')
+    }),
 
     retrievetargetdir: flags.directory({
       char: 'r',
-      description: messages.getMessage('retrievetargetdir')})
+      description: messages.getMessage('retrievetargetdir')
+    }),
+
+    retrievetype: flags.enum({
+      char: 't',
+      description: messages.getMessage('retrieveType'),
+      options: ['all, list']
+    }),
+
+    targetmacros: flags.array({
+      char: 'm',
+      description: messages.getMessage('targetMacros')
+    })
   };
 
   protected static supportsUsername = true;
@@ -82,8 +95,8 @@ export default class Org extends SfdxCommand {
       AccessType: string;
     }
 
-    result = await conn.query<Folder>(this.getTargetOrgFolderQueryString(folderNamesSet));
-    const folderRecords = result.records;
+    let targetFolderResult = await conn.query<Folder>(this.getTargetOrgFolderQueryString(folderNamesSet));
+    const folderRecords = targetFolderResult.records;
     this.ux.logJson(folderRecords);
 
     // ----------------------------------------

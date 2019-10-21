@@ -4,5 +4,7 @@
   "forceFlagDescription": "example boolean flag",
   "errorNoOrgResults": "No results found for the org '%s'.",
   "macroDeveloperName": "(required) developer name of the macro to pull",
-  "retrievetargetdir": "(required) directory root for the retrieved files"
+  "retrievetargetdir": "(required) directory root for the retrieved files",
+  "retrieveType": "(required) type of macro retrieve. Either list or all.",
+  "targetMacros": "(optional) list of macros to be retrieved. Required if the retrieveType is \"list\""
 }
