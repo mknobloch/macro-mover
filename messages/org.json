@@ -1,8 +1,0 @@
-{
-  "retrieveDescription": "retrieves macros and their related macroinstructions from an org and writes to a file",
-  "filename": "(optional) name of the macro retrieve output file",
-  "retrievetargetdir": "(required) directory root for the retrieved files",
-  "targetMacros": "(required) list of macros to be retrieved.",
-  "errorNoMacrosReturned": "No macros matching the given names were found in the target org.",
-  "errorWritingJson": "There was an error writing the results of the retrieval command to '%s'."
-}
