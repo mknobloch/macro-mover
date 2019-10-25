@@ -1,5 +1,5 @@
 import { flags, SfdxCommand } from '@salesforce/command';
-import { Messages, SfdxError } from '@salesforce/core';
+import { Messages, SfdxError, fs } from '@salesforce/core';
 import { AnyJson } from '@salesforce/ts-types';
 
 // Initialize Messages with the current plugin directory
@@ -37,18 +37,101 @@ export default class Org extends SfdxCommand {
   protected static requiresProject = false;
 
   public async run(): Promise<AnyJson> {
+    fs.readJson(this.flags.macrofilename)
+      .then(result => {
+        this.handleMacroJson(result.Macros);
+      })
+      .catch(error => {
+        throw new SfdxError(messages.getMessage('deploy.errors.readingJson', ['./' + this.flags.macrofilename]));
+      })
+  }
 
-    //params
-    const name = this.flags.name || 'world';
-
-    //config defaults:
-    this.ux.log(JSON.stringify(this.configAggregator.getPropertyValue('defaultusername')));
-
-    // this.org is guaranteed because requiresUsername=true, as opposed to supportsUsername
+  private async handleMacroJson(macroJson) {
     const conn = this.org.getConnection();
 
+    interface Folder {
+      Id: string;
+      Name: string;
+      DeveloperName: string;
+    }
+
+    let folderResult = await conn.query<Folder>(this.getFolderQuery(macroJson));
+
+    let folderMap = this.getFolderMap(folderResult.records);
+
+    // check macros to make sure all have folders
+    // if no folder found in map create folder
+
+    let macrosToInsert = this.getInsertReadyMacros(macroJson, folderMap);
+    let macroInsertResult = this.insertMacros(macrosToInsert);
+
+    // w/ new ids, iterate over orig. JSON & build MacroInstruction json to insert
+    // insert MacroInstructions
 
     // Return an object to be displayed with --json
     return { };
+  }
+
+  private getFolderQuery(macroJson) {
+    let folderQuery = 'SELECT Id, DeveloperName ' +
+                      'FROM Folder ' +
+                      'WHERE DeveloperName IN (';
+
+    macroJson.forEach(macro => {
+      folderQuery += '\'' + macro.Folder.DeveloperName + '\','
+    });
+
+    return folderQuery.substring(0, folderQuery.length - 1) + ')';
+  }
+
+  private getFolderMap(folderRecords) {
+    let folderMap = new Map<String, String>();
+    folderRecords.forEach(record => {
+      folderMap.set(record.DeveloperName, record.Id);
+    })
+    return folderMap;
+  }
+
+  private getInsertReadyMacros(macroJson, folderMap) {
+    var macrosToInsert = new Array();
+    macroJson.forEach(macro => {
+      macrosToInsert.push({
+        "Description": macro.Description,
+        "FolderId": folderMap.get(macro.Folder.DeveloperName),
+        "IsAlohaSupported": macro.IsAlohaSupported,
+        "IsLightningSupported": macro.IsLightningSupported,
+        "Name": macro.Name,
+        "StartingContext": macro.StartingContext
+      });
+    });
+    return macrosToInsert;
+  }
+
+  private getInsertReadyMacroInstructions() {
+
+  }
+
+  private insertMacros(macrosToInsert) {
+    let conn = this.org.getConnection();
+
+    conn.bulk.load("Macro", "insert", macrosToInsert, function(error, records) {
+      if (error) {
+        console.log(error);
+      } 
+
+      for (var i=0; i < records.length; i++) {
+        if (records[i].success) {
+          console.log("#" + (i+1) + " loaded successfully, id = " + records[i].id);
+        } else {
+          console.log("#" + (i+1) + " error occurred, message = " + records[i].errors.join(', '));
+        }
+      }
+
+      return records;
+    })
+  }
+
+  private insertMacroInstructions() {
+
   }
 }

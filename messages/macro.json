@@ -15,6 +15,9 @@
     "description": "\nDeploys macros and their related macroinstructions to a target org from a file",
     "parameters": {
       "fileName": "filepath to the macro file to push to the target org"
+    },
+    "errors": {
+      "readingJson": "There was an error reading the selected file at '%s'. The selected file does not exist or is malformed."
     }
   }
 }

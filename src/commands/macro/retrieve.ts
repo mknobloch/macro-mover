@@ -55,9 +55,7 @@ export default class Org extends SfdxCommand {
     interface Macro {
       Id: string;
       Description: string;
-      FolderName: string;
-      IsAlohaSupported: boolean;
-      IsLightingSupported: boolean;
+      "Folder.DeveloperName": string;
       Name: string;
       StartingContext: string;
     }
@@ -115,7 +113,7 @@ export default class Org extends SfdxCommand {
   }
 
   private getMacroQuery(targetMacros) { 
-    let macroQuery = 'SELECT Id, Description, FolderName, IsAlohaSupported, IsLightningSupported, Name, StartingContext ' +
+    let macroQuery = 'SELECT Id, Description, Folder.DeveloperName, Name, StartingContext ' +
                      'FROM Macro ' +
                      'WHERE Name IN (';
 
