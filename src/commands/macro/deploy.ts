@@ -56,14 +56,42 @@ export default class Org extends SfdxCommand {
     }
 
     let folderResult = await conn.query<Folder>(this.getFolderQuery(macroJson));
+    this.ux.log('the folder result');
+    this.ux.logJson(folderResult.records);
 
     let folderMap = this.getFolderMap(folderResult.records);
+    this.ux.log('the map');
+    this.ux.logJson(folderMap);
+
+    var newFolders = [];
+    macroJson.forEach(macro => {
+      if(!folderMap.has(macro.Folder.DeveloperName)) {
+        newFolders.push({
+          Name: macro.Folder.Name,
+          DeveloperName: macro.Folder.DeveloperName
+        });
+      }
+    })
+
+    this.ux.log('the new folders to create');
+    this.ux.logJson(newFolders);
+
+    let foldersToInsert = this.getInsertReadyFolders(newFolders);
+    this.ux.log('folders to insert');
+    this.ux.logJson(foldersToInsert);
+    this.insertFolders(foldersToInsert)
+      .then(folderInsertResult => {
+        this.ux.log('folder insert result');
+        this.ux.logJson(folderInsertResult);
+      });
+
 
     // check macros to make sure all have folders
     // if no folder found in map create folder
 
     let macrosToInsert = this.getInsertReadyMacros(macroJson, folderMap);
-    let macroInsertResult = this.insertMacros(macrosToInsert);
+
+    // let macroInsertResult = this.insertMacros(macrosToInsert);
 
     // w/ new ids, iterate over orig. JSON & build MacroInstruction json to insert
     // insert MacroInstructions
@@ -73,7 +101,7 @@ export default class Org extends SfdxCommand {
   }
 
   private getFolderQuery(macroJson) {
-    let folderQuery = 'SELECT Id, DeveloperName ' +
+    let folderQuery = 'SELECT Id, DeveloperName, AccessType, IsReadonly, NamespacePrefix, Type ' +
                       'FROM Folder ' +
                       'WHERE DeveloperName IN (';
 
@@ -90,6 +118,20 @@ export default class Org extends SfdxCommand {
       folderMap.set(record.DeveloperName, record.Id);
     })
     return folderMap;
+  }
+
+  private getInsertReadyFolders(newFolders) {
+    var foldersToInsert = [];
+    newFolders.forEach(newFolder => {
+      foldersToInsert.push({
+        Name: newFolder.Name,
+        DeveloperName: newFolder.DeveloperName,
+        AccessType: "Hidden",
+        IsReadonly: "True",
+        Type: "Macro"
+      })
+    })
+    return foldersToInsert;
   }
 
   private getInsertReadyMacros(macroJson, folderMap) {
@@ -109,6 +151,25 @@ export default class Org extends SfdxCommand {
 
   private getInsertReadyMacroInstructions() {
 
+  }
+
+  private insertFolders(foldersToInsert) {
+    let conn = this.org.getConnection();
+    return conn.bulk.load("Folder", "insert", foldersToInsert, function(error, records) {
+      if (error) {
+        throw new SfdxError(messages.getMessage('deploy.errors.insertingFolders', [foldersToInsert, error]));
+      } 
+
+      for (var i=0; i < records.length; i++) {
+        if (records[i].success) {
+          console.log("#" + (i+1) + " loaded successfully, id = " + records[i].id);
+        } else {
+          console.log("#" + (i+1) + " error occurred, message = " + records[i].errors.join(', '));
+        }
+      }
+
+      return records;
+    })
   }
 
   private insertMacros(macrosToInsert) {

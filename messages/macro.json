@@ -17,7 +17,8 @@
       "fileName": "filepath to the macro file to push to the target org"
     },
     "errors": {
-      "readingJson": "There was an error reading the selected file at '%s'. The selected file does not exist or is malformed."
+      "readingJson": "There was an error reading the selected file at '%s'. The selected file does not exist or is malformed.",
+      "insertingFolders": "There was an error inserting folders for the supplied macros using the Bulk API.\nThe folder payload used was: %s\nThe error from the Bulk API was: %s"
     }
   }
 }

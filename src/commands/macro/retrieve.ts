@@ -1,6 +1,7 @@
 import { flags, SfdxCommand } from '@salesforce/command';
 import { Messages, SfdxError, fs } from '@salesforce/core';
 import { AnyJson } from '@salesforce/ts-types';
+import { jsonIncludes } from '@salesforce/kit';
 
 // Initialize Messages with the current plugin directory
 Messages.importMessagesDirectory(__dirname);
@@ -56,6 +57,7 @@ export default class Org extends SfdxCommand {
       Id: string;
       Description: string;
       "Folder.DeveloperName": string;
+      "Folder.Name": string;
       Name: string;
       StartingContext: string;
     }
@@ -66,6 +68,7 @@ export default class Org extends SfdxCommand {
     // Query the org
     let macroResult = await conn.query<Macro>(this.getMacroQuery(this.flags.targetmacros));
     const macroRecords = JSON.parse(JSON.stringify(macroResult.records).replace(/null/g, '""'));
+    this.ux.logJson(macroRecords);
 
     if(macroRecords.length === 0) {
       throw new SfdxError(messages.getMessage('retrieve.errors.noMacrosReturned'));
@@ -113,7 +116,7 @@ export default class Org extends SfdxCommand {
   }
 
   private getMacroQuery(targetMacros) { 
-    let macroQuery = 'SELECT Id, Description, Folder.DeveloperName, Name, StartingContext ' +
+    let macroQuery = 'SELECT Id, Description, Folder.DeveloperName, Folder.Name, Name, StartingContext ' +
                      'FROM Macro ' +
                      'WHERE Name IN (';
 
