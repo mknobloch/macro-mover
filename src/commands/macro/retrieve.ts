@@ -1,7 +1,6 @@
 import { flags, SfdxCommand } from '@salesforce/command';
 import { Messages, SfdxError, fs } from '@salesforce/core';
 import { AnyJson } from '@salesforce/ts-types';
-import { jsonIncludes } from '@salesforce/kit';
 
 // Initialize Messages with the current plugin directory
 Messages.importMessagesDirectory(__dirname);
@@ -10,7 +9,7 @@ Messages.importMessagesDirectory(__dirname);
 // or any library that is using the messages framework can also be loaded this way.
 const messages = Messages.loadMessages('macro-mover', 'macro');
 
-export default class Org extends SfdxCommand {
+export default class MacroRetrieve extends SfdxCommand {
 
   public static description = messages.getMessage('retrieve.description');
 
