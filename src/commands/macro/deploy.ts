@@ -43,22 +43,36 @@ export default class MacroDeploy extends SfdxCommand {
       DeveloperName: string;
     }
 
+    // Folder Map section --> can be broken out at the end
+    this.ux.log('\n==================== FOLDERS ====================')
+    this.ux.log('\nChecking for folders in the target environments');
     let folderResult = await conn.query<Folder>(this.getFolderQueryForMacros(macroRecords));
+    this.ux.log('\n' + folderResult.records.length + ' folder(s) found in the target environment.');
     let folderMap = this.getFolderMap(folderResult.records);
 
     let newFolders = this.getNewFolders(macroRecords, folderMap);
     let foldersToInsert = this.getInsertReadyFolders(newFolders);
+    this.ux.log('\n' + newFolders.length + ' new folder(s) need to be created.');
 
     if(foldersToInsert.length > 0) {
-      await conn.bulk.load("Folder", "insert", foldersToInsert);
+      this.ux.log('\n' + 'Inserting ' + foldersToInsert.length + ' new folder(s) not in the target environment.');
+      let folderInsertResult = await conn.bulk.load("Folder", "insert", foldersToInsert);
+      this.ux.log('\n' + this.getSuccessfulRecordCount(folderInsertResult) + ' folder(s) successfully inserted.');
       let newFolderResult = await conn.query<Folder>(this.getFolderQueryForNewFolders(newFolders));
       this.addNewFoldersToFolderMap(newFolderResult.records, folderMap)
     }
+    // End Folder Map section
 
     // check macros to make sure all have folders
     // if no folder found in map create folder
 
+    this.ux.log('\n==================== MACROS ====================')
     let macrosToInsert = this.getInsertReadyMacros(macroRecords, folderMap);
+    if(macrosToInsert.length > 0) {
+      this.ux.log('\nInserting ' + macrosToInsert.length + ' macro(s).')
+      let macroInsertResult = await conn.bulk.load("Macro", "insert", macrosToInsert);
+      this.ux.log('\n' + this.getSuccessfulRecordCount(macroInsertResult) + ' macro(s) inserted successfully.');
+    }
 
     // let macroInsertResult = this.insertMacros(macrosToInsert);
 
@@ -83,9 +97,14 @@ export default class MacroDeploy extends SfdxCommand {
                       'FROM Folder ' +
                       'WHERE DeveloperName IN (';
 
+    let folderSet = new Set<String>();
+
     macros.forEach(macro => {
       folderQuery += '\'' + macro.Folder.DeveloperName + '\','
+      folderSet.add(macro.Folder.DeveloperName);
     });
+
+    this.ux.log('\n' + folderSet.size + ' parent folder(s) found in the macro file.')
 
     return folderQuery.substring(0, folderQuery.length - 1) + ')';
   }
@@ -152,35 +171,24 @@ export default class MacroDeploy extends SfdxCommand {
         "IsAlohaSupported": macro.IsAlohaSupported,
         "IsLightningSupported": macro.IsLightningSupported,
         "Name": macro.Name,
-        "DeveloperName": macro.DeveloperName,
         "StartingContext": macro.StartingContext
       });
     });
     return macrosToInsert;
   }
 
-  private getInsertReadyMacroInstructions() {
-
+  private getSuccessfulRecordCount(insertResult) {
+    let successfulInserts = 0;
+    insertResult.forEach(insert => {
+        if(insert.success) {
+          successfulInserts++;
+        }
+      })
+      return successfulInserts;
   }
 
-  private insertMacros(macrosToInsert) {
-    let conn = this.org.getConnection();
+  private getInsertReadyMacroInstructions() {
 
-    conn.bulk.load("Macro", "insert", macrosToInsert, function(error, records) {
-      if (error) {
-        console.log(error);
-      } 
-
-      for (var i=0; i < records.length; i++) {
-        if (records[i].success) {
-          console.log("#" + (i+1) + " loaded successfully, id = " + records[i].id);
-        } else {
-          console.log("#" + (i+1) + " error occurred, message = " + records[i].errors.join(', '));
-        }
-      }
-
-      return records;
-    })
   }
 
   private insertMacroInstructions() {

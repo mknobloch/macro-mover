@@ -67,7 +67,6 @@ export default class MacroRetrieve extends SfdxCommand {
     // Query the org
     let macroResult = await conn.query<Macro>(this.getMacroQuery(this.flags.targetmacros));
     const macroRecords = JSON.parse(JSON.stringify(macroResult.records).replace(/null/g, '""'));
-    this.ux.logJson(macroRecords);
 
     if(macroRecords.length === 0) {
       throw new SfdxError(messages.getMessage('retrieve.errors.noMacrosReturned'));
