@@ -1,0 +1,24 @@
+{
+  "retrieve": {
+    "description": "\nRetrieves macros and their related macroinstructions from an org and writes to a file",
+    "parameters": {
+      "filename": "(optional) name of the macro retrieve output file",
+      "targetDir": "directory root for the retrieved files",
+      "macroList": "list of macros to be retrieved"
+    },
+    "errors": {
+      "noMacrosReturned": "No macros matching the given names were found in the target org.",
+      "writingJson": "There was an error writing the results of the retrieval command to '%s'."
+    }
+  },
+  "deploy": {
+    "description": "\nDeploys macros and their related macroinstructions to a target org from a file",
+    "parameters": {
+      "fileName": "filepath to the macro file to push to the target org"
+    },
+    "errors": {
+      "readingJson": "There was an error reading the selected file at '%s'. The selected file does not exist or is malformed.",
+      "insertingFolders": "There was an error inserting folders for the supplied macros using the Bulk API.\nThe folder payload used was: %s\nThe error from the Bulk API was: %s"
+    }
+  }
+}
