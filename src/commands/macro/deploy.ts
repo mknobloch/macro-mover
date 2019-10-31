@@ -8,7 +8,6 @@ const messages = Messages.loadMessages('macro-mover', 'macro');
 export default class MacroDeploy extends SfdxCommand {
 
   public static description = messages.getMessage('deploy.description');
-
   public static examples = [
   `$ sfdx hello:org --targetusername myOrg@example.com --targetdevhubusername devhub@org.com
   Hello world! This is org: MyOrg and I will be around until Tue Mar 20 2018!
@@ -18,9 +17,7 @@ export default class MacroDeploy extends SfdxCommand {
   Hello myname! This is org: MyOrg and I will be around until Tue Mar 20 2018!
   `
   ];
-
   public static args = [{name: 'file'}];
-
   protected static flagsConfig = {
     macrofilename: flags.string({
       char: 'f',
@@ -32,6 +29,8 @@ export default class MacroDeploy extends SfdxCommand {
   protected static requiresProject = false;
 
   public async run(): Promise<AnyJson> {
+    let results = {};
+
     let macroJson = await this.readMacroJson();
     let macroRecords = macroJson.Macros;
 
@@ -48,39 +47,54 @@ export default class MacroDeploy extends SfdxCommand {
     this.ux.log('\nChecking for folders in the target environments');
     let folderResult = await conn.query<Folder>(this.getFolderQueryForMacros(macroRecords));
     this.ux.log('\n' + folderResult.records.length + ' folder(s) found in the target environment.');
-    let folderMap = this.getFolderMap(folderResult.records);
+    let folderMap = this.getIdByFieldMap(folderResult.records, 'DeveloperName');
 
     let newFolders = this.getNewFolders(macroRecords, folderMap);
     let foldersToInsert = this.getInsertReadyFolders(newFolders);
     this.ux.log('\n' + newFolders.length + ' new folder(s) need to be created.');
 
     if(foldersToInsert.length > 0) {
+      results['attemptedFolderInserts'] = foldersToInsert.length;
       this.ux.log('\n' + 'Inserting ' + foldersToInsert.length + ' new folder(s) not in the target environment.');
       let folderInsertResult = await conn.bulk.load("Folder", "insert", foldersToInsert);
+      results['successfulFolderInserts'] = folderInsertResult.length;
       this.ux.log('\n' + this.getSuccessfulRecordCount(folderInsertResult) + ' folder(s) successfully inserted.');
-      let newFolderResult = await conn.query<Folder>(this.getFolderQueryForNewFolders(newFolders));
-      this.addNewFoldersToFolderMap(newFolderResult.records, folderMap)
+      let newFolderResult = await conn.query<Folder>(this.getIdAndFieldQueryById(newFolders, 'DeveloperName', 'Folder', 'DeveloperName'));
+      this.addNewFoldersToFolderMap(newFolderResult.records, folderMap);
     }
-    // End Folder Map section
 
-    // check macros to make sure all have folders
-    // if no folder found in map create folder
+    interface Macro {
+      Id: string;
+      Name: string;
+      DeveloperName: string;
+    }
 
     this.ux.log('\n==================== MACROS ====================')
     let macrosToInsert = this.getInsertReadyMacros(macroRecords, folderMap);
     if(macrosToInsert.length > 0) {
+      results['attemptedMacroInserts'] = macrosToInsert.length;
       this.ux.log('\nInserting ' + macrosToInsert.length + ' macro(s).')
       let macroInsertResult = await conn.bulk.load("Macro", "insert", macrosToInsert);
+      results['successfulMacroInserts'] = macroInsertResult.length;
       this.ux.log('\n' + this.getSuccessfulRecordCount(macroInsertResult) + ' macro(s) inserted successfully.');
+
+      let macroQueryResult = await conn.query<Macro>(this.getIdAndFieldQueryById(macroInsertResult, 'Name', 'Macro', 'id'));
+      let macroMap = this.getIdByFieldMap(macroQueryResult.records, 'Name');
+
+      this.ux.log('\n==================== MACRO INSTRUCTIONS ====================')
+      let macroInstructionsToInsert = this.getInsertReadyMacroInstructions(macroRecords, macroMap);
+      if(macroInstructionsToInsert.length > 0) {
+        results['attemptedMacroInstructionInserts'] = macroInstructionsToInsert.length;
+        this.ux.log('\nInserting ' + macroInstructionsToInsert.length + ' macro instruction(s).')
+        let macroInstructionInsertResult = await conn.bulk.load("MacroInstruction", "insert", macroInstructionsToInsert);
+        results['successfulMacroInstructionInserts'] = macroInstructionInsertResult.length;
+        this.ux.log('\n' + this.getSuccessfulRecordCount(macroInstructionInsertResult) + ' macro instruction(s) inserted successfully.');
+      }
     }
 
-    // let macroInsertResult = this.insertMacros(macrosToInsert);
-
-    // w/ new ids, iterate over orig. JSON & build MacroInstruction json to insert
-    // insert MacroInstructions
-
-    // Return an object to be displayed with --json
-    return { };
+    this.ux.log('\n==================== DEPLOY RESULTS ====================')
+    this.ux.logJson(results);
+    return results;
   }
 
   private async readMacroJson() {
@@ -109,12 +123,12 @@ export default class MacroDeploy extends SfdxCommand {
     return folderQuery.substring(0, folderQuery.length - 1) + ')';
   }
 
-  private getFolderMap(folderRecords) {
-    let folderMap = new Map<String, String>();
-    folderRecords.forEach(record => {
-      folderMap.set(record.DeveloperName, record.Id);
+  private getIdByFieldMap(records, fieldApiName) {
+    let developerNameByIdMap = new Map<String, String>();
+    records.forEach(record => {
+      developerNameByIdMap.set(record[fieldApiName], record.Id);
     })
-    return folderMap;
+    return developerNameByIdMap;
   }
 
   private getNewFolders(macros, folderMap) {
@@ -144,27 +158,15 @@ export default class MacroDeploy extends SfdxCommand {
     return foldersToInsert;
   }
 
-  private getFolderQueryForNewFolders(newFolders) {
-    let folderQuery = 'SELECT Id, DeveloperName ' +
-                      'FROM Folder ' +
-                      'WHERE DeveloperName IN (';
-
-    newFolders.forEach(newFolder => {
-      folderQuery += '\'' + newFolder.DeveloperName + '\','
-    });
-
-    return folderQuery.substring(0, folderQuery.length - 1) + ')';
-  }
-
   private addNewFoldersToFolderMap(newFolders, folderMap) {
     newFolders.forEach(newFolder => {
       folderMap.set(newFolder.DeveloperName, newFolder.Id);
-    }) 
+    })
   }
 
-  private getInsertReadyMacros(macroRecords, folderMap) {
+  private getInsertReadyMacros(macros, folderMap) {
     var macrosToInsert = new Array();
-    macroRecords.forEach(macro => {
+    macros.forEach(macro => {
       macrosToInsert.push({
         "Description": macro.Description,
         "FolderId": folderMap.get(macro.Folder.DeveloperName),
@@ -177,6 +179,36 @@ export default class MacroDeploy extends SfdxCommand {
     return macrosToInsert;
   }
 
+  private getInsertReadyMacroInstructions(macros, macroMap) {
+    let macroInstructionsToInsert = new Array();
+    macros.forEach(macro => {
+      macro.MacroInstructions.forEach(macroInstruction => {
+        macroInstructionsToInsert.push({
+          "MacroId": macroMap.get(macro.Name),
+          "Operation": macroInstruction.Operation,
+          "SortOrder": macroInstruction.SortOrder,
+          "Target": macroInstruction.Target,
+          "Value": macroInstruction.Value,
+          "ValueRecord": macroInstruction.ValueRecord
+        });
+      }, this)
+    }, this)
+    return macroInstructionsToInsert;
+  }
+
+  // this method is awful and needs to be refactored/simplified...
+  private getIdAndFieldQueryById(insertResult, fields, sObjectType, whereField) {
+    let query = 'SELECT Id, ' + fields + ' ' + 
+                'FROM ' + sObjectType + ' ' +
+                'WHERE ' + whereField + ' IN (';
+
+    insertResult.forEach(insert => {
+      query += '\'' + insert[whereField] + '\','
+    })
+
+    return query.substring(0, query.length - 1) + ')';
+  }
+
   private getSuccessfulRecordCount(insertResult) {
     let successfulInserts = 0;
     insertResult.forEach(insert => {
@@ -185,13 +217,5 @@ export default class MacroDeploy extends SfdxCommand {
         }
       })
       return successfulInserts;
-  }
-
-  private getInsertReadyMacroInstructions() {
-
-  }
-
-  private insertMacroInstructions() {
-
   }
 }
